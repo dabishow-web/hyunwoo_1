@@ -1,0 +1,9 @@
+{
+  "name": "Co-Budget (공동 가계부)",
+  "description": "가족, 커플, 팀을 위한 스마트 공동 자산 관리 서비스입니다. 수입/지출을 분리하여 관리하고, 사진과 위치 정보를 포함한 기록, 예산 초과 경고 알림, 그리고 AI 기반 영수증 분석 기능을 제공합니다.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ]
+}
