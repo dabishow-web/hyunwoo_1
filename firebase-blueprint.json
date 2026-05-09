@@ -1,0 +1,208 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile information",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "avatar": { "type": "string" },
+        "color": { "type": "string" },
+        "themeColor": { "type": "string" },
+        "communityId": { "type": "string" }
+      },
+      "required": ["id", "name", "communityId"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "Financial transaction record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "type": "string", "enum": ["INCOME", "EXPENSE"] },
+        "amount": { "type": "number" },
+        "categoryId": { "type": "string" },
+        "userId": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "description": { "type": "string" },
+        "communityId": { "type": "string" }
+      },
+      "required": ["id", "type", "amount", "categoryId", "userId", "date", "communityId"]
+    },
+    "DiaryEntry": {
+      "title": "DiaryEntry",
+      "description": "Personal or shared diary entry",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "content": { "type": "string" },
+        "mood": { "type": "string" },
+        "communityId": { "type": "string" }
+      },
+      "required": ["id", "userId", "date", "content", "communityId"]
+    },
+    "ScheduleEntry": {
+      "title": "ScheduleEntry",
+      "description": "Calendar schedule or task",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "time": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "isCompleted": { "type": "boolean" },
+        "category": { "type": "string" },
+        "communityId": { "type": "string" }
+      },
+      "required": ["id", "userId", "date", "title", "communityId"]
+    },
+    "Subscription": {
+      "title": "Subscription",
+      "description": "Recurring subscription service",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "amount": { "type": "number" },
+        "billingDate": { "type": "number" },
+        "userId": { "type": "string" },
+        "isShared": { "type": "boolean" },
+        "iconId": { "type": "string" },
+        "communityId": { "type": "string" }
+      },
+      "required": ["id", "name", "amount", "billingDate", "userId", "communityId"]
+    },
+    "StickerGoal": {
+      "title": "StickerGoal",
+      "description": "Shared goal with sticker rewards",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "targetCount": { "type": "number" },
+        "currentCount": { "type": "number" },
+        "assignedToUserId": { "type": "string" },
+        "createdByUserId": { "type": "string" },
+        "isCompleted": { "type": "boolean" },
+        "communityId": { "type": "string" }
+      },
+      "required": ["id", "title", "targetCount", "communityId"]
+    },
+    "BucketGoal": {
+      "title": "BucketGoal",
+      "description": "Long-term financial or life goal",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "targetAmount": { "type": "number" },
+        "currentAmount": { "type": "number" },
+        "isCompleted": { "type": "boolean" },
+        "communityId": { "type": "string" }
+      },
+      "required": ["id", "title", "targetAmount", "communityId"]
+    },
+    "Category": {
+      "title": "Category",
+      "description": "Budget category with limits",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "group": { "type": "string" },
+        "type": { "type": "string", "enum": ["INCOME", "EXPENSE"] },
+        "budgetLimit": { "type": "number" },
+        "color": { "type": "string" },
+        "iconId": { "type": "string" },
+        "individualLimits": { "type": "object" },
+        "communityId": { "type": "string" }
+      },
+      "required": ["id", "name", "group", "type", "budgetLimit", "communityId"]
+    },
+    "SupportMessage": {
+      "title": "SupportMessage",
+      "description": "Donation or support message from a user",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "senderId": { "type": "string" },
+        "senderName": { "type": "string" },
+        "receiverId": { "type": "string" },
+        "amount": { "type": "number" },
+        "message": { "type": "string" },
+        "adminReply": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "isMonthly": { "type": "boolean" },
+        "communityId": { "type": "string" }
+      },
+      "required": ["id", "senderId", "receiverId", "amount", "createdAt", "communityId"]
+    },
+    "Notice": {
+      "title": "Notice",
+      "description": "App updates and announcements",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "videoUrl": { "type": "string" },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "likes": { "type": "array", "items": { "type": "string" } },
+        "viewCount": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "authorId": { "type": "string" },
+        "authorName": { "type": "string" },
+        "communityId": { "type": "string" }
+      },
+      "required": ["id", "title", "content", "createdAt", "authorId", "communityId"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile data"
+    },
+    "/communities/{communityId}/categories/{categoryId}": {
+      "schema": "Category",
+      "description": "Shared budget categories"
+    },
+    "/communities/{communityId}/transactions/{transactionId}": {
+      "schema": "Transaction",
+      "description": "Shared transactions"
+    },
+    "/communities/{communityId}/diaries/{diaryId}": {
+      "schema": "DiaryEntry",
+      "description": "Shared diaries"
+    },
+    "/communities/{communityId}/schedules/{scheduleId}": {
+      "schema": "ScheduleEntry",
+      "description": "Shared schedules"
+    },
+    "/communities/{communityId}/subscriptions/{subscriptionId}": {
+      "schema": "Subscription",
+      "description": "Shared subscriptions"
+    },
+    "/communities/{communityId}/stickerGoals/{goalId}": {
+      "schema": "StickerGoal",
+      "description": "Shared sticker goals"
+    },
+    "/communities/{communityId}/bucketGoals/{goalId}": {
+      "schema": "BucketGoal",
+      "description": "Shared bucket goals"
+    },
+    "/communities/{communityId}/support_messages/{messageId}": {
+      "schema": "SupportMessage",
+      "description": "Support messages and donations"
+    },
+    "/communities/{communityId}/notices/{noticeId}": {
+      "schema": "Notice",
+      "description": "App announcements"
+    }
+  }
+}

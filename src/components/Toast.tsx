@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { X, AlertCircle, CheckCircle, Info } from 'lucide-react';
 
-export type ToastType = 'success' | 'warning' | 'error' | 'info';
+import { ToastType } from '../../types';
 
 interface ToastProps {
   message: string;
@@ -20,18 +20,18 @@ export const Toast: React.FC<ToastProps> = ({ message, type, onClose, duration =
 
   const getStyles = () => {
     switch (type) {
-      case 'success': return 'bg-emerald-50 border-emerald-200 text-emerald-800';
-      case 'warning': return 'bg-yellow-50 border-yellow-200 text-yellow-800';
-      case 'error': return 'bg-rose-50 border-rose-200 text-rose-800';
+      case 'SUCCESS': return 'bg-emerald-50 border-emerald-200 text-emerald-800';
+      case 'ERROR': return 'bg-rose-50 border-rose-200 text-rose-800';
+      case 'INFO': return 'bg-blue-50 border-blue-200 text-blue-800';
       default: return 'bg-blue-50 border-blue-200 text-blue-800';
     }
   };
 
   const getIcon = () => {
     switch (type) {
-      case 'success': return <CheckCircle size={20} className="text-emerald-500" />;
-      case 'warning': return <AlertCircle size={20} className="text-yellow-500" />;
-      case 'error': return <AlertCircle size={20} className="text-rose-500" />;
+      case 'SUCCESS': return <CheckCircle size={20} className="text-emerald-500" />;
+      case 'ERROR': return <AlertCircle size={20} className="text-rose-500" />;
+      case 'INFO': return <Info size={20} className="text-blue-500" />;
       default: return <Info size={20} className="text-blue-500" />;
     }
   };

@@ -1,573 +1,549 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Cell } from 'recharts';
+import React, { useState, useEffect } from 'react';
 import { 
-  MapPin, Image as ImageIcon, ChevronLeft, ChevronRight, Calendar as CalendarIcon, 
-  Plus, Settings, ArrowLeft, ClipboardList, Utensils, Bus, ShoppingBag, 
-  Home, Banknote, Coins, Palmtree, HeartPulse, GraduationCap, Coffee, BarChart3,
-  ArrowUpDown, MoreHorizontal, User as UserIcon, X
+  Utensils, Bus, ShoppingBag, Home, Banknote, Coins, Palmtree, HeartPulse, 
+  GraduationCap, Coffee, Smartphone, Car, PawPrint, Gift, Scissors, 
+  BookOpen, Wine, Music, Plane, Shirt, MoreHorizontal, Zap, CreditCard, Trash2, BookHeart, Calendar, X
 } from 'lucide-react';
 
-import { Transaction, User, Category, TransactionType, UserRole, BudgetStatus } from './types';
-import { Layout } from './components/Layout';
-import { TransactionForm } from './components/TransactionForm';
-import { BudgetCard } from './components/BudgetCard';
-import { BudgetSettingModal } from './components/BudgetSettingModal';
-import { Toast, ToastType } from './components/Toast';
+import { TransactionType, ToastType } from './types';
+import { Layout } from './src/components/Layout';
+import { TransactionForm } from './src/components/TransactionForm';
+import { Toast } from './src/components/Toast';
+import { BudgetSettingModal } from './src/components/BudgetSettingModal';
+import { CategoryDetailModal } from './src/components/CategoryDetailModal';
+import { DiaryScheduleForm } from './src/components/DiaryScheduleForm';
+import { Login } from './src/components/Login';
+import { CommunitySetup } from './src/components/CommunitySetup';
+import { HomeTab } from './src/components/tabs/HomeTab';
+import { WalletTab } from './src/components/tabs/WalletTab';
+import { DiaryTab } from './src/components/tabs/DiaryTab';
+import { AssetManagement } from './src/components/AssetManagement';
+import { CounselingHistory } from './src/components/CounselingHistory';
+import { RoutineTab } from './src/components/RoutineTab';
+import { PsychologicalReportTab } from './src/components/PsychologicalReportTab';
+import { RelationshipReportTab } from './src/components/RelationshipReportTab';
+import { NoticeTab } from './src/components/NoticeTab';
+import { AnimatePresence } from 'motion/react';
 
-// --- 모의 데이터 (한국어) ---
-const MOCK_USERS: User[] = [
-  { id: 'u1', name: '관리자', avatar: '관', role: UserRole.ADMIN, color: '#000000' },
-  { id: 'u2', name: '사용자', avatar: '사', role: UserRole.MEMBER, color: '#71717a' },
-];
+import { auth, db, onAuthStateChanged } from './src/firebase';
+import { onSnapshot, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { useStore } from './src/store';
 
-const MOCK_CATEGORIES: Category[] = [
-  { id: 'c1', name: '식비', type: TransactionType.EXPENSE, budgetLimit: 500000, color: '#FF0000' }, // 색상 변경: Vibrant Red (#FF0000)
-  { id: 'c2', name: '교통', type: TransactionType.EXPENSE, budgetLimit: 150000, color: '#000000' },
-  { id: 'c3', name: '쇼핑', type: TransactionType.EXPENSE, budgetLimit: 300000, color: '#000000' },
-  { id: 'c4', name: '주거/통신', type: TransactionType.EXPENSE, budgetLimit: 600000, color: '#000000' },
-  { id: 'c7', name: '카페/간식', type: TransactionType.EXPENSE, budgetLimit: 100000, color: '#000000' },
-  { id: 'c8', name: '문화/여가', type: TransactionType.EXPENSE, budgetLimit: 200000, color: '#000000' },
-  { id: 'c9', name: '의료/건강', type: TransactionType.EXPENSE, budgetLimit: 100000, color: '#000000' },
-  { id: 'c10', name: '교육/학습', type: TransactionType.EXPENSE, budgetLimit: 200000, color: '#000000' },
-  { id: 'c5', name: '급여', type: TransactionType.INCOME, budgetLimit: 0, color: '#000000' },
-  { id: 'c6', name: '기타수입', type: TransactionType.INCOME, budgetLimit: 0, color: '#000000' },
-];
+// --- 아이콘 및 공통 렌더러 ---
+export const ICON_MAP: Record<string, React.ElementType> = {
+  food: Utensils, transport: Bus, shopping: ShoppingBag, home: Home, salary: Banknote,
+  money: Coins, leisure: Palmtree, health: HeartPulse, education: GraduationCap, cafe: Coffee,
+  phone: Smartphone, car: Car, pet: PawPrint, gift: Gift, beauty: Scissors,
+  book: BookOpen, drink: Wine, culture: Music, travel: Plane, utility: Zap,
+  clothes: Shirt, card: CreditCard, other: MoreHorizontal,
+  netflix: Plane, youtube: Music, coupang: ShoppingBag, wave: Wine
+};
 
-const MOCK_TRANSACTIONS: Transaction[] = [
-  { id: 't1', type: TransactionType.INCOME, amount: 3500000, categoryId: 'c5', userId: 'u1', date: '2023-10-01', description: '10월 정기 급여' },
-  { id: 't2', type: TransactionType.EXPENSE, amount: 12000, categoryId: 'c1', userId: 'u1', date: '2023-10-02', description: '점심 식사' },
-  { id: 't3', type: TransactionType.EXPENSE, amount: 55000, categoryId: 'c3', userId: 'u2', date: '2023-10-03', description: '생활용품 구매' },
-  { id: 't4', type: TransactionType.EXPENSE, amount: 12500, categoryId: 'c2', userId: 'u2', date: '2023-10-04', description: '택시비' },
-  { id: 't5', type: TransactionType.EXPENSE, amount: 320000, categoryId: 'c4', userId: 'u1', date: '2023-10-05', description: '월세 납부' },
-  { id: 't6', type: TransactionType.EXPENSE, amount: 480000, categoryId: 'c1', userId: 'u1', date: '2023-10-10', description: '가족 외식' },
-  { id: 't7', type: TransactionType.EXPENSE, amount: 4500, categoryId: 'c7', userId: 'u2', date: '2023-10-11', description: '스타벅스' },
-];
-
-// --- 헬퍼: 아이콘 매핑 ---
-const getCategoryIcon = (categoryName: string, size: number = 20) => {
-  const name = categoryName.toUpperCase();
-  if (name.includes('MEAL') || name.includes('식비')) return <Utensils size={size} />;
-  if (name.includes('TRANSPORT') || name.includes('교통')) return <Bus size={size} />;
-  if (name.includes('SHOPPING') || name.includes('쇼핑')) return <ShoppingBag size={size} />;
-  if (name.includes('HOUSE') || name.includes('주거')) return <Home size={size} />;
-  if (name.includes('SALARY') || name.includes('급여')) return <Banknote size={size} />;
-  if (name.includes('BONUS') || name.includes('수입')) return <Coins size={size} />;
-  if (name.includes('CAFE') || name.includes('카페')) return <Coffee size={size} />;
-  if (name.includes('LEISURE') || name.includes('여가')) return <Palmtree size={size} />;
-  if (name.includes('HEALTH') || name.includes('의료')) return <HeartPulse size={size} />;
-  if (name.includes('EDUCATION') || name.includes('교육')) return <GraduationCap size={size} />;
-  return <MoreHorizontal size={size} />;
+export const renderCategoryIcon = (iconId: string, size: number = 20) => {
+  const IconComponent = ICON_MAP[iconId] || ICON_MAP.other;
+  return <IconComponent size={size} />;
 };
 
 const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'DASHBOARD' | 'BUDGET' | 'HISTORY' | 'SUMMARY'>('DASHBOARD');
-  const [users] = useState<User[]>(MOCK_USERS);
-  const [currentUser, setCurrentUser] = useState<User>(MOCK_USERS[0]);
-  const [categories, setCategories] = useState<Category[]>(MOCK_CATEGORIES);
-  const [transactions, setTransactions] = useState<Transaction[]>(MOCK_TRANSACTIONS);
-  
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [isBudgetEditOpen, setIsBudgetEditOpen] = useState(false);
-  
-  const [viewMode, setViewMode] = useState<'JOINT' | 'INDIVIDUAL'>('JOINT');
-  const [selectedUserId, setSelectedUserId] = useState<string>(currentUser.id);
-  const [selectedChartCategoryId, setSelectedChartCategoryId] = useState<string | null>(null);
-  const [summarySortOrder, setSummarySortOrder] = useState<'DESC' | 'ASC'>('DESC');
-  
-  const [historyDate, setHistoryDate] = useState(new Date('2023-10-01'));
-  const [calendarType, setCalendarType] = useState<'EXPENSE' | 'INCOME' | 'BALANCE'>('EXPENSE');
-  const [selectedCalendarDateKey, setSelectedCalendarDateKey] = useState<string | null>(null);
-  const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
+  const [activeTab, setActiveTab] = useState<'HOME' | 'WALLET' | 'DIARY' | 'ROUTINE' | 'REPORT' | 'RELATIONSHIP' | 'SETTINGS' | 'NOTICE'>('HOME');
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [isCommunityLoading, setIsCommunityLoading] = useState(false);
+  const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
+
+  const currentUser = useStore(state => state.currentUser);
+  const setCurrentUser = useStore(state => state.setCurrentUser);
+  const communityId = useStore(state => state.communityId);
+  const setCommunityId = useStore(state => state.setCommunityId);
+  const syncData = useStore(state => state.syncData);
+  const addTransaction = useStore(state => state.addTransaction);
+  const addDiary = useStore(state => state.addDiary);
+  const addSchedule = useStore(state => state.addSchedule);
+  const categories = useStore(state => state.categories);
+  const users = useStore(state => state.users);
+  const transactions = useStore(state => state.transactions);
+  const resetAllData = useStore(state => state.resetAllData);
+  const updateUser = useStore(state => state.updateUser);
+  const setCategories = useStore(state => state.setCategories);
 
   useEffect(() => {
-    if ('Notification' in window && Notification.permission !== 'granted') {
-      Notification.requestPermission();
+    const storedId = localStorage.getItem('communityId');
+    if (storedId) setCommunityId(storedId);
+  }, [setCommunityId]);
+
+  useEffect(() => {
+    if (auth.currentUser && !communityId) {
+      const unsub = onSnapshot(doc(db, 'users', auth.currentUser.uid), (doc) => {
+        if (doc.exists()) {
+          const data = doc.data();
+          if (data.communityId) {
+            localStorage.setItem('communityId', data.communityId);
+            setCommunityId(data.communityId);
+          }
+        }
+      });
+      return () => unsub();
     }
-  }, []);
+  }, [communityId, setCommunityId]);
+  const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isBudgetModalOpen, setIsBudgetModalOpen] = useState(false);
+  const [isDiaryModalOpen, setIsDiaryModalOpen] = useState(false);
+  const [isCounselingHistoryOpen, setIsCounselingHistoryOpen] = useState(false);
+  const [diaryFormMode, setDiaryFormMode] = useState<'DIARY' | 'SCHEDULE'>('DIARY');
+  const [isLifeRecordChoiceOpen, setIsLifeRecordChoiceOpen] = useState(false);
+  const [preSelectedDate, setPreSelectedDate] = useState<string | null>(null);
+  const [isConfirmResetOpen, setIsConfirmResetOpen] = useState(false);
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    confirmText?: string;
+    type?: 'DANGER' | 'INFO';
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
 
-  const filteredTransactions = useMemo(() => {
-    if (viewMode === 'JOINT') return transactions;
-    return transactions.filter(t => t.userId === selectedUserId);
-  }, [transactions, viewMode, selectedUserId]);
-
-  const monthlyTransactions = useMemo(() => {
-    const targetYear = historyDate.getFullYear();
-    const targetMonth = historyDate.getMonth();
-    return filteredTransactions.filter(t => {
-      const d = new Date(t.date);
-      return d.getFullYear() === targetYear && d.getMonth() === targetMonth;
+  const confirmAction = (title: string, message: string, onConfirm: () => void, type: 'DANGER' | 'INFO' = 'DANGER') => {
+    setConfirmModal({
+      isOpen: true,
+      title,
+      message,
+      onConfirm,
+      type
     });
-  }, [filteredTransactions, historyDate]);
-
-  const groupedHistory = useMemo(() => {
-    const groups: Record<string, Transaction[]> = {};
-    monthlyTransactions.forEach(tx => {
-      if (!groups[tx.date]) groups[tx.date] = [];
-      groups[tx.date].push(tx);
-    });
-    return groups;
-  }, [monthlyTransactions]);
-
-  const totalIncome = useMemo(() => monthlyTransactions.filter(t => t.type === TransactionType.INCOME).reduce((acc, t) => acc + t.amount, 0), [monthlyTransactions]);
-  const totalExpense = useMemo(() => monthlyTransactions.filter(t => t.type === TransactionType.EXPENSE).reduce((acc, t) => acc + t.amount, 0), [monthlyTransactions]);
-
-  const chartData = useMemo(() => {
-    const data = categories
-      .filter(c => c.type === TransactionType.EXPENSE)
-      .map(cat => {
-         const val = monthlyTransactions
-           .filter(t => t.categoryId === cat.id)
-           .reduce((sum, t) => sum + t.amount, 0);
-         
-         const limit = viewMode === 'JOINT' ? cat.budgetLimit : (cat.budgetLimit / 2);
-         const percentage = limit > 0 ? (val / limit) * 100 : 0;
-         
-         let displayColor = '#e5e5e5'; 
-         if (cat.color !== '#000000') {
-            displayColor = cat.color;
-         } else {
-            if (percentage >= 100) displayColor = '#000000'; 
-            else if (percentage >= 90) displayColor = '#262626'; 
-            else if (percentage >= 70) displayColor = '#737373'; 
-         }
-         
-         return { 
-           id: cat.id, 
-           name: cat.name, 
-           value: val, 
-           color: displayColor,
-         };
-      })
-      .filter(d => d.value > 0);
-      
-    return data.sort((a, b) => {
-      return summarySortOrder === 'DESC' ? b.value - a.value : a.value - b.value;
-    });
-  }, [categories, monthlyTransactions, viewMode, summarySortOrder]);
-
-  const handlePrevMonth = () => { setHistoryDate(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1)); setSelectedCalendarDateKey(null); };
-  const handleNextMonth = () => { setHistoryDate(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1)); setSelectedCalendarDateKey(null); };
-
-  const handleAddTransaction = (newTx: any) => {
-    const tx: Transaction = { ...newTx, id: Math.random().toString(36).substr(2, 9) };
-    setTransactions(prev => [tx, ...prev]);
   };
 
-  // --- 캘린더 생성 로직 ---
-  const calendarCells = useMemo(() => {
-    const year = historyDate.getFullYear();
-    const month = historyDate.getMonth();
-    const firstDay = new Date(year, month, 1).getDay();
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
+  useEffect(() => {
+    let unsub: (() => void) | undefined;
     
-    const cells = [];
-    for (let i = 0; i < firstDay; i++) cells.push(null);
-    for (let i = 1; i <= daysInMonth; i++) cells.push(new Date(year, month, i));
-    return cells;
-  }, [historyDate]);
+    const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        setIsCommunityLoading(true);
+        
+        // Set up real-time listener for current user document
+        unsub = onSnapshot(doc(db, 'users', user.uid), (docSnap) => {
+          if (docSnap.exists()) {
+            const userData = docSnap.data() as any;
+            setCurrentUser({ ...userData, id: docSnap.id });
+            
+            // Sync local history to cloud and vice-versa
+            const localHistory = JSON.parse(localStorage.getItem('community_history') || '[]');
+            const cloudHistory = userData.joinedCommunities || [];
+            const mergedHistory = Array.from(new Set([...cloudHistory, ...localHistory]));
+            
+            // Update cloud if local has more
+            if (mergedHistory.length > cloudHistory.length) {
+               updateDoc(doc(db, 'users', user.uid), { joinedCommunities: mergedHistory });
+            }
+            
+            // Update local if cloud has more
+            if (mergedHistory.length > localHistory.length) {
+              localStorage.setItem('community_history', JSON.stringify(mergedHistory.slice(0, 10)));
+            }
 
-  const dailyAggregates = useMemo(() => {
-    const aggregates: Record<string, number> = {};
-    monthlyTransactions.forEach(tx => {
-      const key = tx.date;
-      if (!aggregates[key]) aggregates[key] = 0;
-      
-      if (calendarType === 'INCOME' && tx.type === TransactionType.INCOME) {
-        aggregates[key] += tx.amount;
-      } else if (calendarType === 'EXPENSE' && tx.type === TransactionType.EXPENSE) {
-        aggregates[key] += tx.amount;
-      } else if (calendarType === 'BALANCE') {
-        aggregates[key] += (tx.type === TransactionType.INCOME ? tx.amount : -tx.amount);
+            if (userData.communityId) {
+              setCommunityId(userData.communityId);
+            }
+            
+            // Update online status if not already true
+            if (!userData.isOnline) {
+              updateDoc(doc(db, 'users', user.uid), { 
+                isOnline: true, 
+                lastSeen: new Date().toISOString() 
+              });
+            }
+          } else {
+            // Initial user setup if document doesn't exist
+            // Try to recover communityId from localStorage or generate a unique one
+            const recoveredCommunityId = localStorage.getItem('communityId');
+            const defaultCommunityId = recoveredCommunityId || user.uid.substring(0, 8).toUpperCase();
+            
+            const newUser = {
+              id: user.uid,
+              name: user.displayName || '익명',
+              avatar: user.photoURL || '♥',
+              color: '#D4C6F0',
+              themeColor: '#FDFBFA',
+              communityId: defaultCommunityId,
+              joinedCommunities: [defaultCommunityId],
+              isOnline: true,
+              lastSeen: new Date().toISOString()
+            };
+            setCurrentUser(newUser);
+            setCommunityId(defaultCommunityId);
+            localStorage.setItem('communityId', defaultCommunityId);
+            setDoc(doc(db, 'users', user.uid), newUser);
+          }
+          setIsCommunityLoading(false);
+          setIsAuthLoading(false);
+        }, (error) => {
+          console.error("Error syncing user data:", error);
+          setIsAuthLoading(false);
+          setIsCommunityLoading(false);
+        });
+
+        // Handle tab close / visibility change
+        const handleVisibilityChange = () => {
+          if (document.visibilityState === 'hidden') {
+            updateDoc(doc(db, 'users', user.uid), { 
+              isOnline: false, 
+              lastSeen: new Date().toISOString() 
+            });
+          } else {
+            updateDoc(doc(db, 'users', user.uid), { 
+              isOnline: true, 
+              lastSeen: new Date().toISOString() 
+            });
+          }
+        };
+
+        window.addEventListener('visibilitychange', handleVisibilityChange);
+        window.addEventListener('beforeunload', () => {
+          updateDoc(doc(db, 'users', user.uid), { isOnline: false });
+        });
+
+      } else {
+        if (unsub) unsub();
+        setCurrentUser(null);
+        setCommunityId(null);
+        setIsAuthLoading(false);
       }
     });
-    return aggregates;
-  }, [monthlyTransactions, calendarType]);
 
-  const toDateKey = (date: Date) => {
-    const y = date.getFullYear();
-    const m = String(date.getMonth() + 1).padStart(2, '0');
-    const d = String(date.getDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
-  };
+    return () => {
+      unsubscribeAuth();
+      if (unsub) unsub();
+    };
+  }, [setCurrentUser, setCommunityId]);
 
-  const selectedDateTransactions = useMemo(() => {
-    if (!selectedCalendarDateKey) return [];
-    return monthlyTransactions.filter(tx => {
-      if (tx.date !== selectedCalendarDateKey) return false;
-      if (calendarType === 'INCOME') return tx.type === TransactionType.INCOME;
-      if (calendarType === 'EXPENSE') return tx.type === TransactionType.EXPENSE;
-      return true; // BALANCE shows both
-    });
-  }, [selectedCalendarDateKey, monthlyTransactions, calendarType]);
+  useEffect(() => {
+    if (communityId) {
+      const unsub = syncData(communityId);
+      
+      // Initialize categories if they don't exist in Firestore
+      const checkAndInitCategories = async () => {
+        const { categories: currentCategories } = useStore.getState();
+        // If we only have the default hardcoded categories and they haven't been synced yet
+        // or if the collection is empty, we should upload them.
+        // The syncData will update the state if they exist.
+        // We can check if any category has a communityId (which we add when saving to Firestore)
+        const hasSynced = currentCategories.some(c => c.communityId === communityId);
+        if (!hasSynced) {
+          // This is a bit tricky since syncData is async. 
+          // Let's wait a bit or check the collection directly.
+          const { getDocs, collection, query } = await import('firebase/firestore');
+          const snap = await getDocs(query(collection(db, `communities/${communityId}/categories`)));
+          if (snap.empty) {
+            await setCategories(currentCategories);
+          }
+        }
+      };
+      
+      checkAndInitCategories();
+      return () => unsub();
+    }
+  }, [communityId, syncData, setCategories]);
+
+  if (isAuthLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#FDFBFA]">
+        <div className="w-12 h-12 border-4 border-pastel-purple border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  if (!currentUser) {
+    return <Login />;
+  }
+
+  if (!communityId && !isCommunityLoading) {
+    return <CommunitySetup onComplete={(id) => {
+      localStorage.setItem('communityId', id);
+      setCommunityId(id);
+    }} />;
+  }
 
   return (
     <Layout 
       activeTab={activeTab} 
       onTabChange={setActiveTab} 
-      onOpenAddModal={() => setIsAddModalOpen(true)}
+      onOpenAddModal={() => setIsQuickAddOpen(true)}
       currentUser={currentUser}
       users={users}
-      onSwitchUser={setCurrentUser}
+      onUpdateTheme={async (userId, color) => {
+        await updateUser(userId, { themeColor: color });
+        setToast({ message: '테마 색상이 변경되었습니다.', type: 'SUCCESS' });
+      }}
+      onSwitchCommunity={async (newId) => {
+        if (!currentUser) return;
+        confirmAction(
+          '공동체 이동',
+          `정말 '${newId}' 공동체로 이동하시겠습니까? 이동 후 데이터가 보이지 않는다면 기존 코드를 다시 확인해 주세요.`,
+          async () => {
+            const updatedJoined = Array.from(new Set([...(currentUser.joinedCommunities || []), newId]));
+            await updateUser(currentUser.id, { 
+              communityId: newId,
+              joinedCommunities: updatedJoined
+            });
+            setCommunityId(newId);
+            localStorage.setItem('communityId', newId);
+            setToast({ message: '공동체가 변경되었습니다. 데이터를 불러옵니다...', type: 'SUCCESS' });
+          },
+          'INFO'
+        );
+      }}
+      onResetData={() => setIsConfirmResetOpen(true)}
+      onShowToast={(message, type) => setToast({ message, type })}
     >
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
-      
-      {/* 관리 모드 컨트롤 */}
-      {activeTab !== 'SUMMARY' && (
-        <div className="mb-10 flex flex-col md:flex-row gap-6 items-center justify-between border-b border-black pb-4">
-          <div className="flex bg-white border border-black p-0.5">
+      <AnimatePresence>
+        {isCounselingHistoryOpen && (
+          <CounselingHistory onClose={() => setIsCounselingHistoryOpen(false)} />
+        )}
+      </AnimatePresence>
+
+      {activeTab === 'HOME' && <HomeTab onTabChange={setActiveTab} onOpenCounselingHistory={() => setIsCounselingHistoryOpen(true)} />}
+      {activeTab === 'WALLET' && <WalletTab onOpenBudgetModal={() => setIsBudgetModalOpen(true)} onConfirm={confirmAction} onShowToast={(message, type) => setToast({ message, type })} />}
+      {activeTab === 'DIARY' && (
+        <DiaryTab 
+          onOpenModal={(date) => {
+            if (date) setPreSelectedDate(date);
+            else setPreSelectedDate(null);
+            setIsLifeRecordChoiceOpen(true);
+          }} 
+          onConfirm={confirmAction} 
+          onShowToast={(message, type) => setToast({ message, type })} 
+        />
+      )}
+      {activeTab === 'ROUTINE' && <RoutineTab />}
+      {activeTab === 'REPORT' && <PsychologicalReportTab />}
+      {activeTab === 'RELATIONSHIP' && <RelationshipReportTab />}
+      {activeTab === 'NOTICE' && <NoticeTab />}
+      {activeTab === 'SETTINGS' && (
+        <div className="space-y-10 animate-in fade-in slide-in-from-bottom-6 duration-700">
+           {/* Settings content is handled within Layout.tsx when activeTab is SETTINGS */}
+        </div>
+      )}
+
+      {isQuickAddOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/20 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="fixed inset-0" onClick={() => setIsQuickAddOpen(false)}></div>
+          <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-10 soft-shadow border border-pastel-lavender/20 relative animate-in zoom-in duration-300">
+            <h3 className="text-xl font-bold text-pastel-text mb-8 text-center">무엇을 기록할까요?</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <button 
+                onClick={() => {
+                  setIsQuickAddOpen(false);
+                  setIsAddModalOpen(true);
+                }}
+                className="flex flex-col items-center gap-4 p-8 rounded-[2rem] bg-pastel-sand/30 hover:bg-pastel-sand/50 transition-all group"
+              >
+                <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-emerald-400 shadow-sm group-hover:scale-110 transition-transform">
+                  <CreditCard size={24} />
+                </div>
+                <span className="text-xs font-bold text-pastel-text">지출/수입</span>
+              </button>
+              <button 
+                onClick={() => {
+                  setIsQuickAddOpen(false);
+                  setIsLifeRecordChoiceOpen(true);
+                }}
+                className="flex flex-col items-center gap-4 p-8 rounded-[2rem] bg-pastel-sand/30 hover:bg-pastel-sand/50 transition-all group"
+              >
+                <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-pastel-purple shadow-sm group-hover:scale-110 transition-transform">
+                  <BookHeart size={24} />
+                </div>
+                <span className="text-xs font-bold text-pastel-text">일기/일정</span>
+              </button>
+            </div>
             <button 
-              onClick={() => setViewMode('JOINT')}
-              className={`px-6 py-1 text-xs font-bold uppercase transition ${viewMode === 'JOINT' ? 'bg-black text-white' : 'text-black hover:bg-zinc-100'}`}
+              onClick={() => setIsQuickAddOpen(false)}
+              className="w-full mt-8 py-4 rounded-2xl text-xs font-bold text-zinc-400 hover:bg-pastel-sand/30 transition-all"
             >
-              공동 관리
-            </button>
-            <button 
-              onClick={() => setViewMode('INDIVIDUAL')}
-              className={`px-6 py-1 text-xs font-bold uppercase transition ${viewMode === 'INDIVIDUAL' ? 'bg-black text-white' : 'text-black hover:bg-zinc-100'}`}
-            >
-              개인 관리
+              닫기
             </button>
           </div>
-
-          {viewMode === 'INDIVIDUAL' && (
-             <div className="flex gap-1">
-               {users.map(u => (
-                 <button 
-                  key={u.id}
-                  onClick={() => setSelectedUserId(u.id)}
-                  className={`px-4 py-1 border text-[10px] font-bold uppercase tracking-widest transition ${selectedUserId === u.id ? 'bg-black text-white border-black' : 'bg-white text-zinc-400 border-zinc-200'}`}
-                 >
-                   {u.name}
-                 </button>
-               ))}
-             </div>
-          )}
         </div>
       )}
 
-      {/* 대시보드 */}
-      {activeTab === 'DASHBOARD' && (
-        <div className="space-y-12">
-          {/* 통계 섹션 */}
-          <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x border border-black bg-white">
-            <div className="p-8">
-              <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">총 잔액</span>
-              <div className="text-3xl font-bold mt-2 tabular-nums">
-                {(totalIncome - totalExpense).toLocaleString()}
-              </div>
-            </div>
-            <div className="p-8">
-              <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">이번 달 수입</span>
-              <div className="text-3xl font-bold mt-2 tabular-nums">
-                + {totalIncome.toLocaleString()}
-              </div>
-            </div>
-            <div className="p-8">
-              <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">이번 달 지출</span>
-              <div className="text-3xl font-bold mt-2 tabular-nums">
-                - {totalExpense.toLocaleString()}
-              </div>
-            </div>
-          </div>
-
-          {/* 메인 차트 섹션 */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-0 border border-black bg-white">
-             {/* 수평 막대 차트 */}
-             <div className="p-8 border-b lg:border-b-0 lg:border-r border-black">
-                <div className="flex items-center justify-between mb-8">
-                   <h3 className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
-                     <BarChart3 size={16} /> 카테고리별 예산 사용률
-                   </h3>
-                   <button onClick={() => setIsBudgetEditOpen(true)} className="p-1 hover:bg-zinc-100 border border-transparent hover:border-black transition">
-                      <Settings size={14} />
-                   </button>
-                </div>
-                
-                <div className="h-[300px] w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                      layout="vertical"
-                      data={chartData}
-                      margin={{ top: 0, right: 30, left: 40, bottom: 0 }}
-                      barSize={12}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e5e5e5" />
-                      <XAxis type="number" hide />
-                      <YAxis 
-                        dataKey="name" 
-                        type="category" 
-                        tick={{ fontSize: 10, fontWeight: 700, fill: '#000' }}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-                      <Tooltip 
-                        cursor={{ fill: '#fafafa' }}
-                        contentStyle={{ backgroundColor: '#000', color: '#fff', border: 'none', borderRadius: '0px', fontSize: '10px' }}
-                        itemStyle={{ color: '#fff' }}
-                        formatter={(val: number) => [`${val.toLocaleString()} 원`, '지출']}
-                      />
-                      <Bar dataKey="value">
-                         {chartData.map((entry, index) => (
-                           <Cell key={`cell-${index}`} fill={entry.color} />
-                         ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-                
-                {/* 범례 */}
-                <div className="flex gap-4 mt-8 justify-center border-t border-zinc-100 pt-4">
-                  {['안전', '주의', '위험', '초과'].map((label, idx) => (
-                    <div key={label} className="flex items-center gap-2 text-[10px] font-bold uppercase text-zinc-400">
-                      <div className="w-2 h-2" style={{ backgroundColor: ['#e5e5e5', '#737373', '#262626', '#000000'][idx] }}></div>
-                      {label}
-                    </div>
-                  ))}
-                </div>
-             </div>
-
-             {/* 요약 리스트 사이드 */}
-             <div className="p-8 bg-zinc-50">
-                <div className="flex items-center justify-between mb-8">
-                  <h4 className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">지출 요약 리스트</h4>
-                  <button 
-                    onClick={() => setSummarySortOrder(prev => prev === 'DESC' ? 'ASC' : 'DESC')}
-                    className="flex items-center gap-2 text-[10px] font-bold hover:text-black transition uppercase bg-white border border-zinc-200 px-3 py-1"
-                  >
-                     <ArrowUpDown size={12} /> {summarySortOrder === 'DESC' ? '높은순' : '낮은순'}
-                  </button>
-                </div>
-
-                <div className="space-y-1 max-h-[300px] overflow-y-auto custom-scrollbar">
-                  {chartData.map((d, i) => (
-                    <div 
-                      key={i} 
-                      onClick={() => setSelectedChartCategoryId(d.id)}
-                      className="flex items-center justify-between p-4 bg-white border border-zinc-200 hover:border-black cursor-pointer transition group"
-                    >
-                      <div className="flex items-center gap-4">
-                        <div className="w-1 h-4" style={{ backgroundColor: d.color }}></div>
-                        <span className="text-xs font-bold tracking-tight uppercase group-hover:pl-1 transition-all">{d.name}</span>
-                      </div>
-                      <span className="text-xs font-bold tabular-nums">{d.value.toLocaleString()}</span>
-                    </div>
-                  ))}
-                  {chartData.length === 0 && <p className="text-[10px] text-zinc-400 text-center py-20 uppercase">기록된 내역이 없습니다</p>}
-                </div>
-             </div>
-          </div>
-
-          {/* 카테고리 그리드 현황 */}
-          <div>
-            <h3 className="text-sm font-bold uppercase tracking-widest mb-6 flex items-center gap-2">
-              <ClipboardList size={16} /> 카테고리별 상세 현황
-            </h3>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-px bg-black border border-black">
-              {categories
-                .filter(c => c.type === TransactionType.EXPENSE)
-                .map(cat => {
-                  const amount = monthlyTransactions.filter(t => t.categoryId === cat.id).reduce((sum, t) => sum + t.amount, 0);
-                  const isSpecificColor = cat.color !== '#000000';
-                  return (
-                    <div key={cat.id} className="bg-white p-6 h-32 flex flex-col justify-between hover:bg-zinc-50 transition">
-                       <div className="flex items-start justify-between">
-                          <div 
-                            className="p-2 border border-zinc-100 transition-colors"
-                            style={{ backgroundColor: isSpecificColor ? cat.color + '20' : '#f4f4f5' }} 
-                          >
-                            <div style={{ color: isSpecificColor ? cat.color : '#000000' }}>
-                              {getCategoryIcon(cat.name, 16)}
-                            </div>
-                          </div>
-                          <p className="text-[9px] font-bold text-zinc-400 uppercase truncate max-w-[60px]" title={cat.name}>{cat.name}</p>
-                       </div>
-                       <div>
-                          <p className="text-lg font-bold tabular-nums truncate">{amount.toLocaleString()}</p>
-                       </div>
-                    </div>
-                  );
-                })}
-            </div>
-          </div>
-
-          {/* 일간 현황 캘린더 */}
-          <div className="border border-black bg-white overflow-hidden">
-            <div className="p-8 border-b border-black flex flex-col md:flex-row items-center justify-between gap-6 bg-zinc-50">
-               <div className="flex items-center gap-3">
-                  <div className="bg-black text-white p-2">
-                    <CalendarIcon size={18} />
-                  </div>
-                  <h3 className="text-sm font-bold uppercase tracking-widest">일간 통합 장부</h3>
-               </div>
-
-               <div className="flex items-center gap-4 border border-black bg-white p-1">
-                  <button onClick={handlePrevMonth} className="p-1 hover:bg-zinc-100 transition"><ChevronLeft size={16} /></button>
-                  <span className="text-xs font-bold uppercase tabular-nums min-w-[100px] text-center">{historyDate.getFullYear()}. {historyDate.getMonth() + 1}</span>
-                  <button onClick={handleNextMonth} className="p-1 hover:bg-zinc-100 transition"><ChevronRight size={16} /></button>
-               </div>
-
-               <div className="flex bg-white border border-black p-0.5">
-                  <button onClick={() => { setCalendarType('INCOME'); setSelectedCalendarDateKey(null); }} className={`px-4 py-1 text-[10px] font-bold uppercase transition ${calendarType === 'INCOME' ? 'bg-black text-white' : 'text-black hover:bg-zinc-100'}`}>수입</button>
-                  <button onClick={() => { setCalendarType('EXPENSE'); setSelectedCalendarDateKey(null); }} className={`px-4 py-1 text-[10px] font-bold uppercase transition ${calendarType === 'EXPENSE' ? 'bg-black text-white' : 'text-black hover:bg-zinc-100'}`}>지출</button>
-                  <button onClick={() => { setCalendarType('BALANCE'); setSelectedCalendarDateKey(null); }} className={`px-4 py-1 text-[10px] font-bold uppercase transition ${calendarType === 'BALANCE' ? 'bg-black text-white' : 'text-black hover:bg-zinc-100'}`}>잔액</button>
-               </div>
+      {isLifeRecordChoiceOpen && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-6 sm:p-12 animate-in fade-in duration-500">
+          <div className="fixed inset-0 bg-zinc-900/40 backdrop-blur-md" onClick={() => setIsLifeRecordChoiceOpen(false)}></div>
+          <div className="bg-white w-full max-w-xl rounded-[3rem] p-12 shadow-2xl border border-white/20 relative animate-in zoom-in-95 duration-500 overflow-hidden">
+            {/* Background Accent */}
+            <div className="absolute -top-24 -right-24 w-64 h-64 bg-pastel-lavender/10 rounded-full blur-3xl"></div>
+            <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-pastel-purple/5 rounded-full blur-3xl"></div>
+            
+            <div className="relative text-center mb-12">
+              <span className="text-[10px] font-black uppercase tracking-[0.3em] text-pastel-purple/60 mb-3 block">New Record</span>
+              <h3 className="text-3xl font-black text-pastel-text tracking-tight">어떤 순간을<br />기록할까요?</h3>
             </div>
 
-            <div className="grid grid-cols-7 border-collapse">
-               {['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'].map(day => (
-                 <div key={day} className="p-4 border-r border-b border-black last:border-r-0 bg-zinc-100 text-[10px] font-bold text-zinc-400 text-center uppercase tracking-widest">
-                   {day}
-                 </div>
-               ))}
-               {calendarCells.map((date, idx) => {
-                 if (!date) return <div key={`empty-${idx}`} className="h-24 border-r border-b border-black last:border-r-0 bg-zinc-50"></div>;
-                 
-                 const dateKey = toDateKey(date);
-                 const amount = dailyAggregates[dateKey] || 0;
-                 const isPositive = amount > 0;
-                 const isNegative = amount < 0;
-                 const isSelected = selectedCalendarDateKey === dateKey;
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 relative">
+              <button 
+                onClick={() => {
+                  setDiaryFormMode('DIARY');
+                  setIsLifeRecordChoiceOpen(false);
+                  setIsDiaryModalOpen(true);
+                }}
+                className="group flex flex-col items-start gap-6 p-10 rounded-[2.5rem] bg-pastel-sand/20 hover:bg-white hover:shadow-xl transition-all border border-transparent hover:border-pastel-lavender/20"
+              >
+                <div className="w-16 h-16 bg-white rounded-3xl flex items-center justify-center text-pastel-purple shadow-sm group-hover:scale-110 transition-all group-hover:rotate-6">
+                  <BookHeart size={32} />
+                </div>
+                <div className="text-left">
+                  <span className="text-lg font-black text-pastel-text block mb-1">일기 기록</span>
+                  <span className="text-[11px] font-semibold text-zinc-400 leading-relaxed block">오늘 하루의 소중한 감정과 이야기를 자유롭게 남겨보세요.</span>
+                </div>
+              </button>
 
-                 return (
-                   <div 
-                     key={dateKey} 
-                     onClick={() => setSelectedCalendarDateKey(isSelected ? null : dateKey)}
-                     className={`h-24 p-3 border-r border-b border-black last:border-r-0 flex flex-col justify-between cursor-pointer transition group ${isSelected ? 'bg-black text-white' : 'hover:bg-zinc-50'}`}
-                   >
-                      <span className={`text-[10px] font-bold transition ${isSelected ? 'text-zinc-400' : 'text-zinc-400 group-hover:text-black'}`}>{date.getDate()}</span>
-                      {amount !== 0 && (
-                        <div className="text-right">
-                           <p className={`text-[10px] font-bold tabular-nums truncate ${isSelected ? 'text-white' : (calendarType === 'BALANCE' ? (isPositive ? 'text-black underline' : isNegative ? 'text-zinc-400' : 'text-black') : 'text-black')}`}>
-                             {isPositive && calendarType !== 'EXPENSE' ? '+' : ''}{amount.toLocaleString()}
-                           </p>
-                        </div>
-                      )}
-                   </div>
-                 );
-               })}
+              <button 
+                onClick={() => {
+                  setDiaryFormMode('SCHEDULE');
+                  setIsLifeRecordChoiceOpen(false);
+                  setIsDiaryModalOpen(true);
+                }}
+                className="group flex flex-col items-start gap-6 p-10 rounded-[2.5rem] bg-pastel-sand/20 hover:bg-white hover:shadow-xl transition-all border border-transparent hover:border-pastel-lavender/20"
+              >
+                <div className="w-16 h-16 bg-white rounded-3xl flex items-center justify-center text-emerald-400 shadow-sm group-hover:scale-110 transition-all group-hover:-rotate-6">
+                  <Calendar size={32} />
+                </div>
+                <div className="text-left">
+                  <span className="text-lg font-black text-pastel-text block mb-1">일정 예약</span>
+                  <span className="text-[11px] font-semibold text-zinc-400 leading-relaxed block">잊지 말아야 할 약속이나 중요한 할 일을 미리 계획하세요.</span>
+                </div>
+              </button>
             </div>
 
-            {/* 날짜 클릭 시 상세 내역 표시 패널 */}
-            {selectedCalendarDateKey && (
-              <div className="border-t border-black bg-white animate-in slide-in-from-bottom-4 duration-300">
-                <div className="p-6 border-b border-zinc-100 flex items-center justify-between bg-zinc-50">
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs font-bold uppercase tracking-widest">{selectedCalendarDateKey.replace(/-/g, '. ')} 상세 현황</span>
-                    <span className="text-[10px] font-bold text-zinc-400 uppercase">({calendarType === 'INCOME' ? '수입' : calendarType === 'EXPENSE' ? '지출' : '전체'})</span>
-                  </div>
-                  <button onClick={() => setSelectedCalendarDateKey(null)} className="p-1 hover:bg-zinc-200 transition"><X size={16} /></button>
-                </div>
-                <div className="divide-y divide-zinc-100 max-h-[300px] overflow-y-auto custom-scrollbar">
-                  {selectedDateTransactions.length > 0 ? selectedDateTransactions.map(tx => (
-                    <div key={tx.id} className="p-6 flex items-center justify-between hover:bg-zinc-50 transition">
-                       <div className="flex items-center gap-6">
-                          <div className="w-10 h-10 border border-zinc-200 flex items-center justify-center bg-white">
-                            {getCategoryIcon(categories.find(c => c.id === tx.categoryId)?.name || '', 18)}
-                          </div>
-                          <div>
-                            <p className="text-xs font-bold uppercase">{tx.description}</p>
-                            <p className="text-[9px] text-zinc-400 font-bold uppercase">{categories.find(c => c.id === tx.categoryId)?.name}</p>
-                          </div>
-                       </div>
-                       <div className="text-right">
-                          <p className={`text-sm font-bold tabular-nums ${tx.type === TransactionType.INCOME ? 'text-black underline' : ''}`}>
-                            {tx.type === TransactionType.INCOME ? '+' : '-'}{tx.amount.toLocaleString()}
-                          </p>
-                          <p className="text-[9px] font-bold uppercase text-zinc-300">{users.find(u => u.id === tx.userId)?.name}</p>
-                       </div>
-                    </div>
-                  )) : (
-                    <div className="p-20 text-center text-[10px] font-bold text-zinc-300 uppercase">해당 조건의 거래 내역이 없습니다</div>
-                  )}
-                </div>
-              </div>
-            )}
+            <div className="mt-12 flex justify-center">
+              <button 
+                onClick={() => setIsLifeRecordChoiceOpen(false)}
+                className="px-8 py-3 rounded-full text-xs font-black text-zinc-400 hover:text-pastel-text transition-colors flex items-center gap-2"
+              >
+                나중에 하기 <X size={14} />
+              </button>
+            </div>
           </div>
         </div>
       )}
 
-      {/* 내역 탭 */}
-      {activeTab === 'HISTORY' && (
-        <div className="border border-black bg-white">
-          <div className="p-6 border-b border-black flex items-center justify-between bg-zinc-50">
-            <h2 className="text-sm font-bold uppercase tracking-widest">상세 거래 로그</h2>
-            <div className="flex items-center gap-4">
-              <button onClick={handlePrevMonth} className="hover:bg-zinc-200 p-1"><ChevronLeft size={16}/></button>
-              <span className="text-xs font-bold uppercase">{historyDate.getFullYear()}. {historyDate.getMonth()+1}</span>
-              <button onClick={handleNextMonth} className="hover:bg-zinc-200 p-1"><ChevronRight size={16}/></button>
-            </div>
-          </div>
-          <div className="divide-y divide-zinc-100">
-             {Object.keys(groupedHistory).length > 0 ? Object.keys(groupedHistory).sort((a,b) => b.localeCompare(a)).map(dateStr => (
-               <div key={dateStr}>
-                  <div className="bg-zinc-50 px-6 py-2 text-[10px] font-bold text-zinc-400 uppercase tracking-tighter border-y border-zinc-100">
-                    {dateStr}
-                  </div>
-                  {groupedHistory[dateStr].map(tx => (
-                    <div key={tx.id} className="p-6 flex items-center justify-between hover:bg-zinc-50 transition">
-                       <div className="flex items-center gap-6">
-                          <div className="w-10 h-10 border border-zinc-200 flex items-center justify-center bg-white">
-                            {getCategoryIcon(categories.find(c => c.id === tx.categoryId)?.name || '', 18)}
-                          </div>
-                          <div>
-                            <p className="text-xs font-bold uppercase">{tx.description}</p>
-                            <p className="text-[9px] text-zinc-400 font-bold uppercase">{categories.find(c => c.id === tx.categoryId)?.name}</p>
-                          </div>
-                       </div>
-                       <div className="text-right">
-                          <p className={`text-sm font-bold tabular-nums ${tx.type === TransactionType.INCOME ? 'text-black underline' : ''}`}>
-                            {tx.type === TransactionType.INCOME ? '+' : '-'}{tx.amount.toLocaleString()}
-                          </p>
-                          <p className="text-[9px] font-bold uppercase text-zinc-300">{users.find(u => u.id === tx.userId)?.name}</p>
-                       </div>
-                    </div>
-                  ))}
-               </div>
-             )) : (
-               <div className="p-20 text-center text-[10px] font-bold text-zinc-300 uppercase">기록된 내역이 없습니다</div>
-             )}
-          </div>
-        </div>
-      )}
-
-      {/* 종합 보고서 탭 */}
-      {activeTab === 'SUMMARY' && (
-        <div className="space-y-12">
-           <div className="p-12 border-2 border-black bg-white flex flex-col items-center text-center">
-              <ClipboardList size={48} className="mb-6" />
-              <h1 className="text-4xl font-bold uppercase tracking-tighter mb-2">월간 재무 보고서</h1>
-              <p className="text-xs font-bold text-zinc-400 uppercase tracking-widest">{historyDate.getFullYear()} . {historyDate.getMonth() + 1}</p>
-              
-              <div className="grid grid-cols-2 gap-12 mt-12 w-full max-w-2xl border-t border-black pt-12">
-                 <div>
-                    <span className="text-[10px] font-bold uppercase text-zinc-400 block mb-2">총 수입 합계</span>
-                    <span className="text-3xl font-bold tabular-nums">{totalIncome.toLocaleString()}</span>
-                 </div>
-                 <div>
-                    <span className="text-[10px] font-bold uppercase text-zinc-400 block mb-2">총 지출 합계</span>
-                    <span className="text-3xl font-bold tabular-nums">{totalExpense.toLocaleString()}</span>
-                 </div>
-              </div>
-           </div>
-        </div>
-      )}
-
-      {/* 모달 섹션 */}
       {isAddModalOpen && (
         <TransactionForm 
-          onClose={() => setIsAddModalOpen(false)}
-          onSubmit={handleAddTransaction}
-          categories={categories}
-          users={users}
-          currentUser={currentUser}
+          onClose={() => setIsAddModalOpen(false)} 
+          onSubmit={async (data) => {
+            await addTransaction(data);
+            setToast({ message: '거래 내역이 저장되었습니다.', type: 'SUCCESS' });
+          }} 
+          onShowToast={(message, type) => setToast({ message, type })}
+          categories={categories} 
+          users={users} 
+          currentUser={currentUser} 
         />
       )}
-      {isBudgetEditOpen && (
+      
+      {isDiaryModalOpen && (
+        <DiaryScheduleForm 
+          mode={diaryFormMode}
+          initialDate={preSelectedDate || undefined}
+          onClose={() => {
+            setIsDiaryModalOpen(false);
+            setPreSelectedDate(null);
+          }} 
+          onSubmit={async (type, data) => {
+            if (type === 'DIARY') {
+              await addDiary({ ...data, userId: currentUser.id });
+              setToast({ message: '일기가 기록되었습니다.', type: 'SUCCESS' });
+            } else {
+              await addSchedule({ ...data, userId: currentUser.id, isCompleted: false });
+              setToast({ message: '일정이 등록되었습니다.', type: 'SUCCESS' });
+            }
+          }} 
+          onShowToast={(message, type) => setToast({ message, type })}
+        />
+      )}
+
+      {isBudgetModalOpen && (
         <BudgetSettingModal 
           categories={categories}
-          onClose={() => setIsBudgetEditOpen(false)}
-          onSave={(updated) => setCategories(updated)}
+          users={users}
+          transactions={transactions}
+          onClose={() => setIsBudgetModalOpen(false)}
+          onSave={async (updated) => {
+            await setCategories(updated);
+            setToast({ message: '예산 설정이 저장되었습니다.', type: 'SUCCESS' });
+          }}
+          onShowToast={(message, type) => setToast({ message, type })}
         />
+      )}
+
+      {isConfirmResetOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/20 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-10 soft-shadow border border-pastel-lavender/20 text-center space-y-8 animate-in zoom-in duration-300">
+            <div className="w-16 h-16 bg-rose-50 text-rose-400 rounded-full flex items-center justify-center mx-auto shadow-inner">
+              <Zap size={32} fill="currentColor" />
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-xl font-bold text-pastel-text">데이터 초기화</h3>
+              <p className="text-xs text-zinc-400 font-medium leading-relaxed">
+                정말 모든 데이터를 초기화하시겠습니까?<br/>이 작업은 되돌릴 수 없습니다.
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <button 
+                onClick={() => setIsConfirmResetOpen(false)}
+                className="flex-1 py-4 rounded-2xl text-xs font-bold text-zinc-400 bg-pastel-sand/50 hover:bg-pastel-sand transition-all"
+              >
+                취소
+              </button>
+              <button 
+                onClick={async () => {
+                  await resetAllData();
+                  setIsConfirmResetOpen(false);
+                  setToast({ message: '모든 데이터가 초기화되었습니다.', type: 'INFO' });
+                }}
+                className="flex-1 py-4 rounded-2xl text-xs font-bold text-white bg-rose-400 hover:bg-rose-500 shadow-lg shadow-rose-200 transition-all"
+              >
+                초기화
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {confirmModal.isOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/20 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-10 soft-shadow border border-pastel-lavender/20 text-center space-y-8 animate-in zoom-in duration-300">
+            <div className={`w-16 h-16 ${confirmModal.type === 'INFO' ? 'bg-pastel-purple/10 text-pastel-purple' : 'bg-rose-50 text-rose-400'} rounded-full flex items-center justify-center mx-auto shadow-inner`}>
+              {confirmModal.type === 'INFO' ? <Zap size={32} /> : <Trash2 size={32} />}
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-xl font-bold text-pastel-text">{confirmModal.title}</h3>
+              <p className="text-xs text-zinc-400 font-medium leading-relaxed">
+                {confirmModal.message}
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <button 
+                onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+                className="flex-1 py-4 rounded-2xl text-xs font-bold text-zinc-400 bg-pastel-sand/50 hover:bg-pastel-sand transition-all"
+              >
+                취소
+              </button>
+              <button 
+                onClick={() => {
+                  confirmModal.onConfirm();
+                  setConfirmModal(prev => ({ ...prev, isOpen: false }));
+                }}
+                className={`flex-1 py-4 rounded-2xl text-xs font-bold text-white ${confirmModal.type === 'INFO' ? 'bg-pastel-purple hover:bg-pastel-purple/90' : 'bg-rose-400 hover:bg-rose-500'} shadow-lg transition-all`}
+              >
+                {confirmModal.confirmText || '확인'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </Layout>
   );
