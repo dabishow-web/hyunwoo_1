@@ -1,75 +1,9 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Default deny catch-all
+    // Broadly allow all operations for testing
     match /{document=**} {
-      allow read, write: if false;
-    }
-
-    // Allow connection test
-    match /_connection_test/{id} {
       allow read, write: if true;
-    }
-
-    // ===============================================================
-    // Helper Functions
-    // ===============================================================
-    function isAuthenticated() {
-      return request.auth != null;
-    }
-
-    function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
-    }
-
-    // Check if the user is a member of the community or has access
-    function isCommunityMember(communityId) {
-      return isAuthenticated();
-    }
-
-    // ===============================================================
-    // Assumed Data Model
-    // ===============================================================
-    // Collection: /users/{userId}
-    // Fields: id, name, avatar, color, themeColor, communityId
-    
-    // Collection: /communities/{communityId}/transactions/{transactionId}
-    // Fields: id, type, amount, categoryId, userId, date, description, communityId
-    
-    // ... and so on for other collections
-
-    // ===============================================================
-    // Rules
-    // ===============================================================
-
-    match /users/{userId} {
-      allow read: if isAuthenticated();
-      allow write: if isOwner(userId);
-    }
-
-    match /communities/{communityId} {
-      allow read: if isCommunityMember(communityId);
-      
-      // notices have special creator-only write permissions
-      match /notices/{noticeId} {
-        allow read: if isAuthenticated();
-        allow write: if isAuthenticated() && request.auth.token.email == 'dabishow8586@gmail.com';
-      }
-
-      // general collections
-      match /transactions/{id} { allow read, write: if isCommunityMember(communityId); }
-      match /diaries/{id} { allow read, write: if isCommunityMember(communityId); }
-      match /schedules/{id} { allow read, write: if isCommunityMember(communityId); }
-      match /fixedExpenses/{id} { allow read, write: if isCommunityMember(communityId); }
-      match /categories/{id} { allow read, write: if isCommunityMember(communityId); }
-      match /counseling/{id} { allow read, write: if isCommunityMember(communityId); }
-      match /routines/{id} { allow read, write: if isCommunityMember(communityId); }
-      match /psych_reports/{id} { allow read, write: if isCommunityMember(communityId); }
-      match /rel_reports/{id} { allow read, write: if isCommunityMember(communityId); }
-      match /support_messages/{id} { allow read, write: if isCommunityMember(communityId); }
-      match /stickerGoals/{id} { allow read, write: if isCommunityMember(communityId); }
-      match /bucketGoals/{id} { allow read, write: if isCommunityMember(communityId); }
-      match /subscriptions/{id} { allow read, write: if isCommunityMember(communityId); }
     }
   }
 }

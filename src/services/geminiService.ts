@@ -3,6 +3,7 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { CounselingRecord, DiaryEntry, LifeRoutine, User } from "../../types";
 
 let AI_CLIENT: GoogleGenAI | null = null;
+let LAST_USED_KEY: string | null = null;
 
 // Simple in-memory cache
 const CACHE: Record<string, { data: any, timestamp: number }> = {};
@@ -49,15 +50,18 @@ const setCache = (key: string, data: any) => {
   }
 };
 
-const getAiClient = () => {
-  if (!AI_CLIENT) {
-    const key = process.env.GEMINI_API_KEY;
-    if (!key) {
-      throw new Error("GEMINI_API_KEY가 정의되지 않았습니다. 환경 설정을 확인해 주세요.");
-    }
-    AI_CLIENT = new GoogleGenAI({ apiKey: key });
+const requestProxy = async (model: string, contents: any, config: any) => {
+  const response = await fetch("/api/gemini", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ model, contents, config }),
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || "Proxy request failed");
   }
-  return AI_CLIENT;
+  const data = await response.json();
+  return data.text;
 };
 
 // Simple hash function for cache keys
@@ -73,8 +77,8 @@ const getHash = (str: string) => {
 
 const callAiWithRetry = async (
   fn: () => Promise<any>,
-  maxRetries: number = 5, // Increased retries
-  baseDelay: number = 2000 // Higher base delay
+  maxRetries: number = 5,
+  baseDelay: number = 2000
 ): Promise<any> => {
   let lastError: any;
   for (let i = 0; i < maxRetries; i++) {
@@ -105,7 +109,7 @@ const callAiWithRetry = async (
   throw lastError;
 };
 
-const DEFAULT_MODEL = "gemini-flash-latest"; // Using alias for stability
+const DEFAULT_MODEL = "gemini-1.5-flash"; // Using stable model name
 
 export const consultAI = async (diaryContent: string, userName: string) => {
   const cacheKey = `consult_${getHash(diaryContent)}_${userName}`;
@@ -119,7 +123,6 @@ export const consultAI = async (diaryContent: string, userName: string) => {
   console.log("[Gemini] consultAI started", { userName, contentLength: diaryContent.length });
   
   try {
-    const ai = getAiClient();
     const cleanContent = diaryContent.replace(/<[^>]*>?/gm, '').replace(/&nbsp;/g, ' ').replace(/&[a-z]+;/g, '');
 
     const prompt = `[역할 정의: 전인적 통합 치유 마스터]
@@ -148,23 +151,18 @@ export const consultAI = async (diaryContent: string, userName: string) => {
           "${cleanContent}"
 
           [필수 포함 요소]
-          - 따뜻한 첫 인사와 공감
+          - 따뜻한 첫 인사과 공감
           - 현재 상태에 대한 심층적 심리 기제 설명
           - 내면을 통찰할 수 있는 핵심적인 질문 (1~2개)
           - 일상에서 실천 가능한 '치유 의식(Ritual)' 제안
           - 희망적인 맺음말과 확언`;
 
     const text = await callAiWithRetry(async () => {
-      const response = await ai.models.generateContent({
-        model: DEFAULT_MODEL,
-        contents: prompt,
-        config: {
-          temperature: 0.7,
-          topP: 0.8,
-          topK: 40,
-        }
+      return await requestProxy(DEFAULT_MODEL, [{ role: "user", parts: [{ text: prompt }] }], {
+        temperature: 0.7,
+        topP: 0.8,
+        topK: 40,
       });
-      return response.text;
     });
 
     const duration = Date.now() - startTime;
@@ -177,19 +175,20 @@ export const consultAI = async (diaryContent: string, userName: string) => {
     setCache(cacheKey, text);
     return text;
   } catch (error: any) {
-    console.error("AI Counseling Error:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+    console.error("AI Counseling Error 상세:", error);
     const errorMessage = error.message || String(error);
+    const statusCode = error.status || error.code || "Unknown";
     
-    if (errorMessage.includes("Forbidden") || errorMessage.includes("403") || errorMessage.includes("permission")) {
-      throw new Error("AI 접근 권한이 거부되었습니다(403 Forbidden). API 키 유효성, 모델 권한, 또는 일일 사용량 제한(Quota)을 확인해 주세요.");
+    if (errorMessage.includes("Forbidden") || errorMessage.includes("403") || statusCode === 403) {
+      throw new Error(`[403 Forbidden] AI 접근 권한이 없습니다. (원인: ${errorMessage}). 결제 설정 또는 API 키 활성화 여부를 확인해 주세요.`);
     }
-    if (errorMessage.includes("API_KEY")) {
-      throw new Error("API 키 설정에 문제가 있습니다. 환경 변수를 확인해 주세요.");
+    if (errorMessage.includes("model") || errorMessage.includes("404") || statusCode === 404) {
+      throw new Error(`[404 Not Found] 모델(${DEFAULT_MODEL})을 찾을 수 없습니다. (원인: ${errorMessage}). API 키가 올바른 프로젝트에서 생성되었는지 확인하세요.`);
     }
-    if (errorMessage.includes("model") || errorMessage.includes("404")) {
-      throw new Error("요청한 AI 모델을 찾을 수 없거나 지원되지 않습니다.");
+    if (errorMessage.includes("Invalid API key") || errorMessage.includes("API_KEY_INVALID")) {
+      throw new Error("입력하신 API 키가 유효하지 않습니다. 'AIza...'로 시작하는 키인지 확인해 주세요.");
     }
-    throw new Error(`AI 상담 중 오류: ${errorMessage}`);
+    throw new Error(`AI 서비스 연결 중 오류 발생(${statusCode}): ${errorMessage}`);
   }
 };
 
@@ -206,8 +205,6 @@ export const generateWeeklyRoutine = async (
   }
 
   try {
-    const ai = getAiClient();
-
     const recentDiaries = diaries.slice(-10).map(d => d.text).join("\n---\n");
     const recentAdvice = records.slice(-10).map(r => r.aiAdvice).join("\n---\n");
 
@@ -233,44 +230,9 @@ export const generateWeeklyRoutine = async (
     반드시 유효한 JSON 형식으로만 답변하십시오.`;
 
     const resultText = await callAiWithRetry(async () => {
-      const response = await ai.models.generateContent({
-        model: DEFAULT_MODEL,
-        contents: prompt,
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              status: { type: Type.STRING, enum: ["STABLE", "CAUTION", "RECOVERY", "BURNOUT"] },
-              diagnosis: { type: Type.STRING },
-              score: { type: Type.NUMBER },
-              days: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    date: { type: Type.STRING },
-                    tasks: {
-                      type: Type.ARRAY,
-                      items: {
-                        type: Type.OBJECT,
-                        properties: {
-                          id: { type: Type.STRING },
-                          title: { type: Type.STRING },
-                          description: { type: Type.STRING },
-                          type: { type: Type.STRING, enum: ["READING", "DIARY", "MEDITATION", "WALKING", "RUNNING", "BREAKFAST", "WAKEUP", "LEARNING", "OTHER"] },
-                          isCompleted: { type: Type.BOOLEAN }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
+      return await requestProxy(DEFAULT_MODEL, [{ role: "user", parts: [{ text: prompt }] }], {
+        responseMimeType: "application/json",
       });
-      return response.text;
     });
 
     const parsed = JSON.parse(resultText.trim());
@@ -295,8 +257,6 @@ export const generateWeeklyReport = async (
   }
 
   try {
-    const ai = getAiClient();
-
     const recentDiaries = diaries.slice(-15).map(d => `[${d.date}] ${d.text}`).join("\n---\n");
     const recentAdvice = records.slice(-15).map(r => `[${r.date}] ${r.aiAdvice}`).join("\n---\n");
 
@@ -320,35 +280,9 @@ export const generateWeeklyReport = async (
     반드시 유효한 JSON 형식으로만 답변하십시오. 한국어로 작성하십시오.`;
 
     const resultText = await callAiWithRetry(async () => {
-      const response = await ai.models.generateContent({
-        model: DEFAULT_MODEL,
-        contents: prompt,
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              summary: { type: Type.STRING },
-              mentalTrend: { type: Type.STRING },
-              directionality: { type: Type.STRING },
-              emotionalShift: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    date: { type: Type.STRING },
-                    score: { type: Type.NUMBER },
-                    emotion: { type: Type.STRING }
-                  }
-                }
-              },
-              positiveTriggers: { type: Type.ARRAY, items: { type: Type.STRING } },
-              negativeTriggers: { type: Type.ARRAY, items: { type: Type.STRING } }
-            }
-          }
-        }
+      return await requestProxy(DEFAULT_MODEL, [{ role: "user", parts: [{ text: prompt }] }], {
+        responseMimeType: "application/json",
       });
-      return response.text;
     });
 
     const parsed = JSON.parse(resultText.trim());
@@ -372,8 +306,6 @@ export const generateRelationshipReport = async (
   }
 
   try {
-    const ai = getAiClient();
-
     const context = users.map(u => {
       const userDiaries = allDiaries.filter(d => d.userId === u.id).slice(-10).map(d => d.text).join(" | ");
       const userAdvice = allCounseling.filter(r => r.userId === u.id).slice(-10).map(r => r.aiAdvice).join(" | ");
@@ -390,23 +322,9 @@ export const generateRelationshipReport = async (
     반드시 유효한 JSON 형식으로만 답변하십시오. 한국어로 작성하십시오.`;
 
     const resultText = await callAiWithRetry(async () => {
-      const response = await ai.models.generateContent({
-        model: DEFAULT_MODEL,
-        contents: prompt,
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              summary: { type: Type.STRING },
-              synergyAnalysis: { type: Type.STRING },
-              positiveTriggers: { type: Type.ARRAY, items: { type: Type.STRING } },
-              recommendations: { type: Type.ARRAY, items: { type: Type.STRING } }
-            }
-          }
-        }
+      return await requestProxy(DEFAULT_MODEL, [{ role: "user", parts: [{ text: prompt }] }], {
+        responseMimeType: "application/json",
       });
-      return response.text;
     });
 
     const parsed = JSON.parse(resultText.trim());
@@ -417,4 +335,3 @@ export const generateRelationshipReport = async (
     throw new Error(`관계 리포트를 생성하는 중 오류가 발생했습니다: ${error.message || String(error)}`);
   }
 };
-

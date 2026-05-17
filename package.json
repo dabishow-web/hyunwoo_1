@@ -4,13 +4,15 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "tsx server.ts",
     "build": "vite build",
     "preview": "vite preview",
+    "start": "node server.ts",
     "lint": "tsc --noEmit"
   },
   "dependencies": {
     "@google/genai": "^1.52.0",
+    "@google/generative-ai": "^0.24.1",
     "@tailwindcss/typography": "^0.5.19",
     "@tiptap/extension-bubble-menu": "^3.22.4",
     "@tiptap/extension-color": "^3.22.4",
@@ -23,6 +25,8 @@
     "@tiptap/pm": "^3.22.4",
     "@tiptap/react": "^3.22.4",
     "@tiptap/starter-kit": "^3.22.4",
+    "@types/express": "^5.0.6",
+    "express": "^4.21.2",
     "firebase": "^12.11.0",
     "lucide-react": "^0.561.0",
     "motion": "^12.38.0",
@@ -30,6 +34,7 @@
     "react-dom": "^19.2.3",
     "react-markdown": "^10.1.0",
     "recharts": "^3.6.0",
+    "tsx": "^4.21.0",
     "vite-plugin-pwa": "^1.2.0",
     "zustand": "^5.0.12"
   },

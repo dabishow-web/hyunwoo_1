@@ -58,6 +58,8 @@ export const DiaryTab: React.FC<{
   const [loadingMessage, setLoadingMessage] = useState("사용자님의 마음을 읽는 중입니다...");
   const [showAiPanel, setShowAiPanel] = useState(false);
   const [savedDiaryId, setSavedDiaryId] = useState<string | null>(null);
+  const [showDebug, setShowDebug] = useState(false);
+  const [debugStatus, setDebugStatus] = useState<string | null>(null);
 
   const loadingMessages = [
     "사용자님의 마음을 읽는 중입니다...",
@@ -99,6 +101,7 @@ export const DiaryTab: React.FC<{
       clearInterval(messageInterval);
       setAiAdvice(advice || "상담 결과를 가져오지 못했습니다.");
       
+      setDebugStatus("연결 성공: AI 응답을 정상적으로 수신했습니다.");
       console.log("[DiaryTab] AI Advice received", { adviceLength: advice?.length });
 
       // 기록 저장 (작성자의 계정으로 저장)
@@ -126,13 +129,22 @@ export const DiaryTab: React.FC<{
       } else {
         console.warn("[DiaryTab] No advice to save");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Gemini AI Error:", err);
+      const isForbidden = err?.message?.includes("403") || err?.message?.includes("Forbidden");
+      
+      if (isForbidden) {
+        setDebugStatus("오류(403): 권한 거부. 프로젝트 설정 또는 결제 상태를 확인하세요.");
+      } else {
+        setDebugStatus(`오류: ${err?.message || "알 수 없는 오류"}`);
+      }
+
       onShowToast?.(
         err instanceof Error ? err.message : "AI 상담 호출 중 오류가 발생했습니다.",
         "ERROR",
       );
-      setShowAiPanel(false);
+      // Don't auto-hide panel if it's a 403 error, so user can see context
+      if (!isForbidden) setShowAiPanel(false);
     } finally {
       setIsConsulting(false);
     }
@@ -903,7 +915,7 @@ export const DiaryTab: React.FC<{
               animate={{ x: 0 }}
               exit={{ x: "100%" }}
               transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              className="fixed top-0 right-0 bottom-0 w-full md:w-[400px] bg-white shadow-2xl z-[150] flex flex-col border-l border-zinc-50"
+              className="fixed top-0 right-0 bottom-0 w-full md:w-[450px] bg-white shadow-2xl z-[150] flex flex-col border-l border-zinc-50"
             >
               <div className="p-6 border-b border-zinc-50 flex justify-between items-center bg-pastel-sand/30">
                 <div className="flex items-center gap-3">
@@ -919,15 +931,51 @@ export const DiaryTab: React.FC<{
                     </p>
                   </div>
                 </div>
-                <button
-                  onClick={() => setShowAiPanel(false)}
-                  className="p-2 hover:bg-white rounded-xl transition-colors text-zinc-300 shadow-sm"
-                >
-                  <X size={18} />
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setShowDebug(!showDebug)}
+                    className={`p-2 rounded-xl transition-colors ${showDebug ? "bg-pastel-purple text-white" : "hover:bg-white text-zinc-300 shadow-sm"}`}
+                    title="진단 도구"
+                  >
+                    <Settings size={18} />
+                  </button>
+                  <button
+                    onClick={() => setShowAiPanel(false)}
+                    className="p-2 hover:bg-white rounded-xl transition-colors text-zinc-300 shadow-sm"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
               </div>
 
               <div className="flex-1 overflow-y-auto custom-scrollbar p-8">
+                {showDebug && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mb-8 p-6 bg-zinc-900 rounded-[2rem] text-zinc-300 font-mono text-[10px] space-y-3 border-4 border-pastel-purple/20"
+                  >
+                    <div className="flex items-center justify-between pb-2 border-b border-zinc-800">
+                      <span className="text-pastel-purple font-bold">--- 시스템 진단 모드 ---</span>
+                      <span className="px-2 py-0.5 bg-pastel-purple/20 text-pastel-purple rounded-md text-[8px]">ACTIVE</span>
+                    </div>
+                    <div className="space-y-1.5 capitalize">
+                      <p><span className="text-zinc-500">상태:</span> {debugStatus || "대기 중"}</p>
+                      <p><span className="text-zinc-500">프로젝트:</span> gen-lang-client-0869534107</p>
+                      <p><span className="text-zinc-500">API 키 출처:</span> {localStorage.getItem("DEBUG_GEMINI_API_KEY") ? "브라우저 콘솔(Debug)" : "환경 변수(App)"}</p>
+                      <p><span className="text-zinc-500">키 스니펫:</span> {(() => {
+                        const k = localStorage.getItem("DEBUG_GEMINI_API_KEY") || "";
+                        return k ? `${k.substring(0, 6)}...${k.substring(k.length - 4)}` : "설정되지 않음";
+                      })()}</p>
+                    </div>
+                    <div className="pt-2 text-zinc-500 leading-relaxed">
+                      <p className="text-pastel-purple mb-1">💡 해결 팁:</p>
+                      <p>1. GCP 콘솔에서 'Generative Language API' 활성화를 확인하세요.</p>
+                      <p>2. 프로젝트 결제 수단(Billing)이 유효한지 확인하세요.</p>
+                    </div>
+                  </motion.div>
+                )}
+
                 {isConsulting ? (
                   <div className="h-full flex flex-col items-center justify-center space-y-6 text-center animate-pulse">
                     <div className="w-20 h-20 bg-pastel-purple/5 rounded-full flex items-center justify-center">
@@ -944,6 +992,24 @@ export const DiaryTab: React.FC<{
                         잠시만 기다려 주세요. 1~2분이 소요될 수 있습니다.
                       </p>
                     </div>
+
+                    {debugStatus?.includes("403") && (
+                      <motion.div 
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="mt-8 p-6 bg-rose-50 border border-rose-100 rounded-[2rem] text-left"
+                      >
+                        <div className="flex items-center gap-3 mb-3 text-rose-500">
+                          <AlertCircle size={20} />
+                          <span className="font-bold text-sm">권한 거부됨 (403 Forbidden)</span>
+                        </div>
+                        <ul className="text-[11px] text-rose-400 space-y-2 list-disc pl-4 font-medium leading-relaxed">
+                          <li>프로젝트(<span className="font-bold underline text-rose-600">gen-lang-client-0581552181</span>) 설정 확인</li>
+                          <li>브라우저 콘솔에서 설정한 키값이 정확한지 확인</li>
+                          <li>Google AI Studio에서 API 키가 활성 상태인지 확인</li>
+                        </ul>
+                      </motion.div>
+                    )}
                   </div>
                 ) : aiAdvice ? (
                   <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">

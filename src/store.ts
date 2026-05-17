@@ -87,6 +87,7 @@ interface AppState {
 
   addCounselingRecord: (record: Omit<CounselingRecord, "id">) => Promise<void>;
   deleteCounselingRecord: (id: string) => Promise<void>;
+  importData: (data: any) => Promise<void>;
 
   updateUser: (id: string, updates: Partial<User>) => Promise<void>;
   resetAllData: () => Promise<void>;
@@ -104,6 +105,8 @@ interface AppState {
 
   addSupportMessage: (message: Omit<SupportMessage, "id">) => Promise<void>;
   updateSupportMessage: (id: string, updates: Partial<SupportMessage>) => Promise<void>;
+
+  importData: (data: any) => Promise<void>;
 
   addNotice: (notice: Omit<Notice, "id">) => Promise<void>;
   updateNotice: (id: string, updates: Partial<Notice>) => Promise<void>;
@@ -815,6 +818,28 @@ export const useStore = create<AppState>((set, get) => ({
         OperationType.DELETE,
         `communities/${communityId}/counseling`,
       );
+    }
+  },
+
+  importData: async (data: any) => {
+    const { communityId } = get();
+    if (!communityId) return;
+    try {
+      if (data.transactions && Array.isArray(data.transactions)) {
+        await Promise.all(data.transactions.map((t: any) => addDoc(collection(db, `communities/${communityId}/transactions`), { ...t, communityId })));
+      }
+      if (data.diaries && Array.isArray(data.diaries)) {
+        await Promise.all(data.diaries.map((d: any) => addDoc(collection(db, `communities/${communityId}/diaries`), { ...d, communityId })));
+      }
+      if (data.schedules && Array.isArray(data.schedules)) {
+        await Promise.all(data.schedules.map((s: any) => addDoc(collection(db, `communities/${communityId}/schedules`), { ...s, communityId })));
+      }
+      if (data.fixedExpenses && Array.isArray(data.fixedExpenses)) {
+        await Promise.all(data.fixedExpenses.map((f: any) => addDoc(collection(db, `communities/${communityId}/fixedExpenses`), { ...f, communityId })));
+      }
+    } catch (err) {
+      console.error("[Store] importData error", err);
+      handleFirestoreError(err, OperationType.WRITE, `communities/${communityId}`);
     }
   },
 

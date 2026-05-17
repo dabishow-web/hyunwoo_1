@@ -71,7 +71,8 @@ export const Layout: React.FC<LayoutProps> = ({
     fixedExpenses,
     updateUser,
     supportMessages,
-    addSupportMessage
+    addSupportMessage,
+    importData
   } = useStore();
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
@@ -319,6 +320,42 @@ export const Layout: React.FC<LayoutProps> = ({
                     </p>
                   </div>
                 </div>
+
+                {/* AI System Diagnostic Section */}
+                <div className="pt-6 border-t border-pastel-lavender/10">
+                  <div className="flex items-center justify-between px-2 mb-4">
+                    <p className="text-[10px] font-black text-zinc-300 uppercase tracking-[0.3em]">AI 시스템 진단</p>
+                    <div className="flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      <span className="text-[9px] font-bold text-emerald-500 uppercase tracking-widest">Active</span>
+                    </div>
+                  </div>
+                  <div className="bg-zinc-50/50 rounded-[2rem] p-6 border border-zinc-100 space-y-4 font-mono text-[10px]">
+                    <div className="flex justify-between items-center text-zinc-500">
+                      <span className="font-bold flex items-center gap-2">
+                        <div className="w-1 h-3 bg-pastel-purple rounded-full" />
+                        PROJECT ID
+                      </span>
+                      <span className="text-zinc-600 font-black tracking-tight">gen-lang-client-0869534107</span>
+                    </div>
+                    <div className="flex justify-between items-center text-zinc-500">
+                      <span className="font-bold flex items-center gap-2">
+                        <div className="w-1 h-3 bg-pastel-sand rounded-full" />
+                        API KEY
+                      </span>
+                      <span className="bg-white px-3 py-1 rounded-lg border border-zinc-100 text-pastel-purple font-black shadow-sm">
+                        {(() => {
+                          const key = localStorage.getItem("DEBUG_GEMINI_API_KEY") || "AIzaSyDXXT8mjio1AbgDIs7sZ4V7FHYJNA-IOcQ";
+                          return `****${key.slice(-4)}`;
+                        })()}
+                      </span>
+                    </div>
+                    
+                    <div className="pt-2 text-[9px] text-zinc-400 leading-relaxed italic text-center">
+                      * AI 기능 장애 시 프로젝트 ID와 API 키 일치 여부를 확인해 주세요.
+                    </div>
+                  </div>
+                </div>
               </div>
               
               <div className="p-10 bg-white border-t border-pastel-lavender/10">
@@ -365,13 +402,6 @@ export const Layout: React.FC<LayoutProps> = ({
             {!isSidebarCollapsed && (
               <div className="flex items-center gap-3">
                 <h1 className="text-xl font-bold tracking-tighter text-pastel-text animate-in fade-in duration-500">Co-Life</h1>
-                <button 
-                  onClick={() => setIsSettingsModalOpen(true)}
-                  className="p-2 bg-pastel-lavender/10 text-zinc-400 hover:text-pastel-purple rounded-xl transition-all"
-                  title="메뉴 관리"
-                >
-                  <Settings size={16} />
-                </button>
               </div>
             )}
           </div>
@@ -423,11 +453,21 @@ export const Layout: React.FC<LayoutProps> = ({
           </div>
         </nav>
 
-        <div className={`p-6 space-y-6 ${isSidebarCollapsed ? 'items-center' : ''}`}>
-          <div className="h-px bg-pastel-lavender/20"></div>
+        <div className={`p-6 space-y-4 flex flex-col ${isSidebarCollapsed ? 'items-center' : ''}`}>
+          <div className="h-px bg-pastel-lavender/20 w-full"></div>
           
+          {/* Settings Button moved here */}
+          <button 
+            onClick={() => setIsSettingsModalOpen(true)}
+            className={`flex items-center hover:bg-pastel-lavender/10 text-zinc-400 hover:text-pastel-purple rounded-2xl transition-all ${isSidebarCollapsed ? 'p-3' : 'px-4 py-3 gap-3 w-full'}`}
+            title="메뉴 관리"
+          >
+            <Settings size={isSidebarCollapsed ? 20 : 18} />
+            {!isSidebarCollapsed && <span className="text-[10px] font-black uppercase tracking-widest">환경 설정</span>}
+          </button>
+
           {/* User Profile in Sidebar */}
-          <div className="relative flex items-center gap-2">
+          <div className="relative flex items-center gap-2 w-full">
             <button 
               onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
               className={`flex-1 flex items-center bg-white rounded-2xl soft-shadow border border-pastel-lavender/30 transition-all hover:border-pastel-purple ${isSidebarCollapsed ? 'p-2 justify-center' : 'p-4 gap-3'}`}
@@ -723,6 +763,41 @@ export const Layout: React.FC<LayoutProps> = ({
                         className="p-2 bg-white rounded-xl border border-zinc-100 hover:border-pastel-purple text-zinc-400 hover:text-pastel-purple transition-all"
                       >
                         <Send size={14} className="rotate-90" />
+                      </button>
+                    </div>
+
+                    <div className="mt-2 flex items-center justify-between bg-zinc-50 p-4 rounded-2xl border border-dashed border-zinc-200">
+                      <div>
+                        <p className="text-[10px] font-bold text-zinc-500 mb-1">데이터 수동 복구</p>
+                        <p className="text-[8px] text-zinc-400">파일을 업로드하여 데이터를 가져옵니다.</p>
+                      </div>
+                      <input 
+                        type="file" 
+                        id="import-data-file" 
+                        className="hidden" 
+                        accept=".json"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          
+                          const reader = new FileReader();
+                          reader.onload = async (event) => {
+                            try {
+                              const content = JSON.parse(event.target?.result as string);
+                              await importData(content);
+                              onShowToast('데이터 복구가 완료되었습니다.', 'SUCCESS');
+                            } catch (err) {
+                              onShowToast('데이터 복구 중 오류가 발생했습니다.', 'ERROR');
+                            }
+                          };
+                          reader.readAsText(file);
+                        }}
+                      />
+                      <button 
+                        onClick={() => document.getElementById('import-data-file')?.click()}
+                        className="p-2 bg-white rounded-xl border border-zinc-100 hover:border-pastel-purple text-zinc-400 hover:text-pastel-purple transition-all"
+                      >
+                        <Send size={14} className="-rotate-90" />
                       </button>
                     </div>
                     <p className="mt-4 text-[10px] text-zinc-400 leading-relaxed">

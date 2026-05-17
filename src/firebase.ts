@@ -1,28 +1,53 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { getFirestore, collection, doc, setDoc, getDoc, onSnapshot, query, where, addDoc, updateDoc, deleteDoc, Timestamp, getDocFromServer } from 'firebase/firestore';
+import { initializeFirestore, collection, doc, setDoc, getDoc, onSnapshot, query, where, addDoc, updateDoc, deleteDoc, Timestamp, getDocFromServer } from 'firebase/firestore';
 
 // Import the Firebase configuration
-import firebaseConfig from '../firebase-applet-config.json';
+import firebaseConfigInternal from '../firebase-applet-config.json';
+
+// Use environment variables if available (prefixed with VITE_), fallback to the bundled config
+const firebaseConfig = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || firebaseConfigInternal.apiKey,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || firebaseConfigInternal.authDomain,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || firebaseConfigInternal.projectId,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || firebaseConfigInternal.storageBucket,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || firebaseConfigInternal.messagingSenderId,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || firebaseConfigInternal.appId,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || firebaseConfigInternal.measurementId,
+  firestoreDatabaseId: import.meta.env.VITE_FIRESTORE_DATABASE_ID || firebaseConfigInternal.firestoreDatabaseId,
+};
 
 // Initialize Firebase SDK
 const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+
+// Initialize Firestore with long polling to bypass potential proxy/connection issues
+// This is critical for environments with restrictive networking or proxy layers.
+export const db = initializeFirestore(app, {
+  experimentalForceLongPolling: true,
+}, firebaseConfig.firestoreDatabaseId);
+
 export const auth = getAuth();
 export const googleProvider = new GoogleAuthProvider();
 
 // Connection Test as per Integration Guidelines
 async function testConnection() {
   try {
-    console.log('Testing Firestore connection to database:', firebaseConfig.firestoreDatabaseId || '(default)');
-    // Try to get a non-existent document to test connectivity
+    const dbId = firebaseConfig.firestoreDatabaseId || '(default)';
+    console.log(`[Firebase] Testing connection to Project: ${firebaseConfig.projectId}, Database: ${dbId}`);
+    
+    // Attempt a direct server fetch to verify connectivity
     await getDocFromServer(doc(db, '_connection_test', 'ping'));
-    console.log('Firestore connection test successful.');
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.error("Please check your Firebase configuration or internet connection.");
-    } else {
-      console.error("Firestore connection test failed:", error);
+    console.log('[Firebase] Connection test successful.');
+  } catch (error: any) {
+    const errorMessage = error?.message || String(error);
+    const errorCode = error?.code || 'unknown';
+    
+    console.error(`[Firebase] Connection test failed (Code: ${errorCode}):`, errorMessage);
+    
+    if (errorCode === 'unavailable') {
+      console.error(">>> HINT: 'unavailable' often means the client cannot reach Google servers. This can be caused by network restrictions or the project being in a suspended/billing-required state.");
+    } else if (errorCode === 'permission-denied') {
+      console.error(">>> HINT: 'permission-denied' means the Security Rules are blocking access. Check firestore.rules.");
     }
   }
 }
