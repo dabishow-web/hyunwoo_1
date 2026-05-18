@@ -328,8 +328,8 @@ export const DiaryScheduleForm: React.FC<DiaryScheduleFormProps> = ({ onClose, o
                 type="text" 
                 value={title} 
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="오늘의 감정을 한줄로 표현하면?"
-                className="w-full bg-transparent text-5xl font-black text-pastel-text placeholder-zinc-100 outline-none border-none leading-tight"
+                placeholder="제목을 입력하세요..."
+                className="w-full bg-transparent text-4xl font-serif text-pastel-text placeholder-zinc-200 outline-none border-none leading-tight py-4"
                 autoFocus
               />
 

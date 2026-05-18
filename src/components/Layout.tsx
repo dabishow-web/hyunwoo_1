@@ -344,10 +344,7 @@ export const Layout: React.FC<LayoutProps> = ({
                         API KEY
                       </span>
                       <span className="bg-white px-3 py-1 rounded-lg border border-zinc-100 text-pastel-purple font-black shadow-sm">
-                        {(() => {
-                          const key = localStorage.getItem("DEBUG_GEMINI_API_KEY") || "AIzaSyDXXT8mjio1AbgDIs7sZ4V7FHYJNA-IOcQ";
-                          return `****${key.slice(-4)}`;
-                        })()}
+                        ****
                       </span>
                     </div>
                     

@@ -185,8 +185,8 @@ export const RichEditor: React.FC<RichEditorProps> = ({ content, onChange, place
         )}
       </AnimatePresence>
 
-      <div className="h-full overflow-y-auto custom-scrollbar p-0.5 relative">
-        <EditorContent editor={editor} className="relative z-10" />
+      <div className="h-full overflow-y-auto custom-scrollbar p-0.5 relative writing-canvas">
+        <EditorContent editor={editor} className="relative z-10 px-4" />
       </div>
 
       {/* Modern Context Menu (Notion Inspired) */}

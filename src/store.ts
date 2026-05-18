@@ -106,8 +106,6 @@ interface AppState {
   addSupportMessage: (message: Omit<SupportMessage, "id">) => Promise<void>;
   updateSupportMessage: (id: string, updates: Partial<SupportMessage>) => Promise<void>;
 
-  importData: (data: any) => Promise<void>;
-
   addNotice: (notice: Omit<Notice, "id">) => Promise<void>;
   updateNotice: (id: string, updates: Partial<Notice>) => Promise<void>;
   deleteNotice: (id: string) => Promise<void>;

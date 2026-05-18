@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="ko">
   <head>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,700;1,400&amp;family=Libre+Caslon+Text:ital,wght@0,400;0,700;1,400&amp;display=swap" rel="stylesheet">
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Co-Budget | Pastel Heart</title>
@@ -21,7 +22,8 @@
               }
             },
             fontFamily: {
-              sans: ['Pretendard', 'Inter', '-apple-system', 'sans-serif'],
+              sans: ['DM Sans', 'Pretendard', 'Inter', '-apple-system', 'sans-serif'],
+              serif: ['Libre Caslon Text', 'serif'],
             },
             borderRadius: {
               '4xl': '2rem',
@@ -83,6 +85,12 @@
       .custom-scrollbar::-webkit-scrollbar-thumb {
         background: #E8E4F8;
         border-radius: 10px;
+      }
+
+      .writing-canvas {
+        background-image: linear-gradient(#e5e2dd 1px, transparent 1px);
+        background-size: 100% 2.4rem;
+        line-height: 2.4rem;
       }
 
       @keyframes spin-slow {
