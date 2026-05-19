@@ -1,10 +1,7 @@
 import express from "express";
 import { createServer as createViteServer } from "vite";
 import path from "path";
-import { fileURLToPath } from "url";
 import { GoogleGenerativeAI } from "@google/generative-ai";
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 let genAI: GoogleGenerativeAI | null = null;
 function getGeminiClient() {
